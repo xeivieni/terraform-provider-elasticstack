@@ -257,37 +257,38 @@ func resourceIndexTemplatePut(ctx context.Context, d *schema.ResourceData, meta 
 	}
 
 	if v, ok := d.GetOk("template"); ok {
-		templ := models.Template{}
 		// only one template block allowed to be declared
-		definedTempl := v.([]interface{})[0].(map[string]interface{})
+		if definedTempl, ok := v.([]interface{})[0].(map[string]interface{}); ok {
+			templ := models.Template{}
 
-		aliases, diags := ExpandIndexAliases(definedTempl["alias"].(*schema.Set))
-		if diags.HasError() {
-			return diags
-		}
-		templ.Aliases = aliases
-
-		if mappings, ok := definedTempl["mappings"]; ok {
-			if mappings.(string) != "" {
-				maps := make(map[string]interface{})
-				if err := json.Unmarshal([]byte(mappings.(string)), &maps); err != nil {
-					return diag.FromErr(err)
-				}
-				templ.Mappings = maps
+			aliases, diags := ExpandIndexAliases(definedTempl["alias"].(*schema.Set))
+			if diags.HasError() {
+				return diags
 			}
-		}
+			templ.Aliases = aliases
 
-		if settings, ok := definedTempl["settings"]; ok {
-			if settings.(string) != "" {
-				sets := make(map[string]interface{})
-				if err := json.Unmarshal([]byte(settings.(string)), &sets); err != nil {
-					return diag.FromErr(err)
+			if mappings, ok := definedTempl["mappings"]; ok {
+				if mappings.(string) != "" {
+					maps := make(map[string]interface{})
+					if err := json.Unmarshal([]byte(mappings.(string)), &maps); err != nil {
+						return diag.FromErr(err)
+					}
+					templ.Mappings = maps
 				}
-				templ.Settings = sets
 			}
-		}
 
-		indexTemplate.Template = &templ
+			if settings, ok := definedTempl["settings"]; ok {
+				if settings.(string) != "" {
+					sets := make(map[string]interface{})
+					if err := json.Unmarshal([]byte(settings.(string)), &sets); err != nil {
+						return diag.FromErr(err)
+					}
+					templ.Settings = sets
+				}
+			}
+
+			indexTemplate.Template = &templ
+		}
 	}
 
 	if v, ok := d.GetOk("version"); ok {

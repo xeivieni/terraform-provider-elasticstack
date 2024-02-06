@@ -157,61 +157,62 @@ func resourceComponentTemplatePut(ctx context.Context, d *schema.ResourceData, m
 
 	if v, ok := d.GetOk("template"); ok {
 		// only one template block allowed to be declared
-		definedTempl := v.([]interface{})[0].(map[string]interface{})
-		definedAliases := definedTempl["alias"].(*schema.Set)
-		templ := models.Template{}
+		if definedTempl, ok := v.([]interface{})[0].(map[string]interface{}); ok {
+			definedAliases := definedTempl["alias"].(*schema.Set)
+			templ := models.Template{}
 
-		aliases := make(map[string]models.IndexAlias, definedAliases.Len())
-		for _, a := range definedAliases.List() {
-			alias := a.(map[string]interface{})
-			templAlias := models.IndexAlias{}
+			aliases := make(map[string]models.IndexAlias, definedAliases.Len())
+			for _, a := range definedAliases.List() {
+				alias := a.(map[string]interface{})
+				templAlias := models.IndexAlias{}
 
-			if f, ok := alias["filter"]; ok {
-				if f.(string) != "" {
-					filterMap := make(map[string]interface{})
-					if err := json.Unmarshal([]byte(f.(string)), &filterMap); err != nil {
+				if f, ok := alias["filter"]; ok {
+					if f.(string) != "" {
+						filterMap := make(map[string]interface{})
+						if err := json.Unmarshal([]byte(f.(string)), &filterMap); err != nil {
+							return diag.FromErr(err)
+						}
+						templAlias.Filter = filterMap
+					}
+				}
+				if ir, ok := alias["index_routing"]; ok {
+					templAlias.IndexRouting = ir.(string)
+				}
+				templAlias.IsHidden = alias["is_hidden"].(bool)
+				templAlias.IsWriteIndex = alias["is_write_index"].(bool)
+				if r, ok := alias["routing"]; ok {
+					templAlias.Routing = r.(string)
+				}
+				if sr, ok := alias["search_routing"]; ok {
+					templAlias.SearchRouting = sr.(string)
+				}
+
+				aliases[alias["name"].(string)] = templAlias
+			}
+			templ.Aliases = aliases
+
+			if mappings, ok := definedTempl["mappings"]; ok {
+				if mappings.(string) != "" {
+					maps := make(map[string]interface{})
+					if err := json.Unmarshal([]byte(mappings.(string)), &maps); err != nil {
 						return diag.FromErr(err)
 					}
-					templAlias.Filter = filterMap
+					templ.Mappings = maps
 				}
 			}
-			if ir, ok := alias["index_routing"]; ok {
-				templAlias.IndexRouting = ir.(string)
-			}
-			templAlias.IsHidden = alias["is_hidden"].(bool)
-			templAlias.IsWriteIndex = alias["is_write_index"].(bool)
-			if r, ok := alias["routing"]; ok {
-				templAlias.Routing = r.(string)
-			}
-			if sr, ok := alias["search_routing"]; ok {
-				templAlias.SearchRouting = sr.(string)
-			}
 
-			aliases[alias["name"].(string)] = templAlias
-		}
-		templ.Aliases = aliases
-
-		if mappings, ok := definedTempl["mappings"]; ok {
-			if mappings.(string) != "" {
-				maps := make(map[string]interface{})
-				if err := json.Unmarshal([]byte(mappings.(string)), &maps); err != nil {
-					return diag.FromErr(err)
+			if settings, ok := definedTempl["settings"]; ok {
+				if settings.(string) != "" {
+					sets := make(map[string]interface{})
+					if err := json.Unmarshal([]byte(settings.(string)), &sets); err != nil {
+						return diag.FromErr(err)
+					}
+					templ.Settings = sets
 				}
-				templ.Mappings = maps
 			}
-		}
 
-		if settings, ok := definedTempl["settings"]; ok {
-			if settings.(string) != "" {
-				sets := make(map[string]interface{})
-				if err := json.Unmarshal([]byte(settings.(string)), &sets); err != nil {
-					return diag.FromErr(err)
-				}
-				templ.Settings = sets
-			}
+			componentTemplate.Template = &templ
 		}
-
-		componentTemplate.Template = &templ
 	}
 
 	if v, ok := d.GetOk("version"); ok {
